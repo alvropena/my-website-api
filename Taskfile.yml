@@ -1,0 +1,153 @@
+version: '3'
+
+dotenv: ["dev.venv"]
+
+vars:
+  VENV: ".venv"
+  PYTHON: "python3"
+  PYTHON_VERSION: "3.11.4"
+
+tasks:
+  venv-create:
+    cmds:
+      - "{{.PYTHON}} -m venv {{.VENV}}"
+      - "{{.PYTHON}} -m pip install --upgrade pip"
+      - "pip install poetry"
+      - "poetry install --no-root"
+    status:
+      - "test -f {{.VENV}}/bin/activate"
+
+  venv-activate:
+    cmds:
+      - "echo 'To activate your venv, run: source {{.VENV}}/bin/activate'"
+
+  pyenv-create:
+    desc: "Create virtual environment with pyenv"
+    cmds:
+      - "pyenv virtualenv {{.PYTHON_VERSION}} {{.VENV}}"
+      - "pyenv local {{.VENV}}"
+
+  pyenv-setup:
+    cmds:
+      - "{{.PYTHON}} -m pip install --upgrade pip"
+      - "pip install poetry"
+      - "poetry install --no-root"
+
+  pyenv-activate:
+    cmds:
+      - "echo 'To activate your pyenv, run: pyenv activate {{.VENV}}'"
+
+  pyenv-remove:
+    cmds:
+      - "pyenv virtualenv-delete {{.VENV}}"
+
+  docker-build:
+    desc: "Build docker containers for the configured environment  type (test, prod, local)"
+    cmds:
+      - "docker compose -p {{.PROJECT_NAME}} -f ./configs/docker/docker-compose-{{.ENV}}.yml build {{.CLI_ARGS}}"
+
+  docker-up:
+    desc: "Start full app in docker"
+    cmds:
+      - "docker compose -p {{.PROJECT_NAME}} -f ./configs/docker/docker-compose-{{.ENV}}.yml up -d"
+
+  docker-db-up:
+    desc: "Start DB containers only"
+    cmds:
+      - "docker compose -p {{.PROJECT_NAME}} -f ./configs/docker/docker-compose-{{.ENV}}.yml up -d db"
+
+  docker-db-backup:
+    desc: "Create a backup file of the current data in the DB"
+    cmds:
+      - "scripts/db_backup.sh"
+
+  docker-stop:
+    desc: "Stop all containers"
+    cmds:
+      - "docker compose -p {{.PROJECT_NAME}} -f ./configs/docker/docker-compose-{{.ENV}}.yml stop"
+
+  docker-down:
+    desc: "Down all containers"
+    cmds:
+      - "docker compose -p {{.PROJECT_NAME}} -f ./configs/docker/docker-compose-{{.ENV}}.yml down --remove-orphans"
+
+  docker-restart:
+    desc: "Restart all containers"
+    cmds:
+      - "docker compose -p {{.PROJECT_NAME}} -f ./configs/docker/docker-compose-{{.ENV}}.yml restart"
+
+  docker-clean-logs:
+    desc: "Clear logs of a specific Docker container by name or ID. ex: task docker-clean-logs -- <container-name>"
+    cmds:
+      - ./scripts/bash/clean-docker-logs.sh {{.CLI_ARGS}}
+
+  isort-format:
+    cmds:
+      - "poetry run isort ."
+
+  isort-check:
+    cmds:
+      - "poetry run isort --check --diff ."
+
+  black-format:
+    cmds:
+      - "poetry run black ."
+
+  black-check:
+    cmds:
+      - "poetry run black --check ."
+
+  mypy:
+    cmds:
+      - "poetry run mypy ."
+
+  pylint:
+    cmds:
+      - "poetry run pylint app"
+
+  pytest-docker:
+    desc: "run pytest in docker (pass args after '--')"
+    cmds:
+      - "docker-compose run app ./docker-entrypoint.sh pytest {{.CLI_ARGS}}"
+
+  pytest:
+    desc: "run pytest locally (pass args after '--')"
+    deps:
+      - docker-db-up
+    cmds:
+      - poetry run pytest -s -vv -x tests/ --cov=app {{.CLI_ARGS}}
+
+  migration:
+    desc: "create alembic migration (pass args after '--')"
+    cmds:
+      - "poetry run alembic revision --autogenerate {{.CLI_ARGS}}"
+
+  upgrade-all:
+    desc: "apply all alembic migration"
+    cmds:
+    - "poetry run alembic upgrade head"
+
+  downgrade-all:
+    desc: "rollback all alembic migrations"
+    cmds:
+    - "poetry run alembic downgrade base"
+
+  # groups
+  format:
+    desc: "run code formatters"
+    cmds:
+      - task: isort-format
+      - task: black-format
+
+  lint:
+    desc: "run linters"
+    cmds:
+      - task: isort-check
+      - task: black-check
+      - task: pylint
+      - task: mypy
+
+  run:
+    desc: "Run the FastAPI application with uvicorn using Poetry"
+    cmds:
+      - "poetry run uvicorn main:app --reload"
