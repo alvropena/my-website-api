@@ -1,14 +1,19 @@
 from fastapi import FastAPI, HTTPException, Request
+from fastapi.middleware.cors import CORSMiddleware
 import openai
 import os
-from dotenv import load_dotenv
-
-load_dotenv()
 
 app = FastAPI()
 
 openai.api_key = os.getenv("OPENAI_API_KEY")
 
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 @app.post("/generate-question/")
 async def generate_question(request: Request):
