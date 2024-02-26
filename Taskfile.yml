@@ -3,9 +3,11 @@ version: '3'
 dotenv: ["dev.venv"]
 
 vars:
-  VENV: ".venv"
-  PYTHON: "python3"
-  PYTHON_VERSION: "3.11.4"
+  PROJECT_NAME: my_website
+  VENV: my_website_api
+  PYTHON: python3
+  PYTHON_VERSION: 3.11.4
+  ENV: local
 
 tasks:
   venv-create:
